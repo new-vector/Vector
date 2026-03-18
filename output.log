@@ -1,0 +1,249 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.2, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\gagan\Documents\GitHub\Vector
+configfile: pyproject.toml
+plugins: anyio-4.12.1, asyncio-1.3.0, cov-7.0.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 55 items
+
+tests\test_backtest.py FF                                                [  3%]
+tests\test_brinks_box.py .....                                           [ 12%]
+tests\test_engine.py F..F                                                [ 20%]
+tests\test_indicators.py ..........                                      [ 38%]
+tests\test_risk.py ......                                                [ 49%]
+tests\test_session.py .........                                          [ 65%]
+tests\test_signals.py ......                                             [ 76%]
+tests\test_vectors.py ......F......                                      [100%]
+
+================================== FAILURES ===================================
+___________ TestBacktestRunner.test_runner_completes_without_error ____________
+
+self = <tests.test_backtest.TestBacktestRunner object at 0x0000024A8F55C410>
+
+    def test_runner_completes_without_error(self):
+        cfg = load_config(overrides={
+            "trade_logic": {"use_ema_filter": False, "require_mid_hold": False},
+            "vectors": {"lookback": 5, "timeframes": ["5m"]},
+            "backtest": {"min_trades_wanted": 1},
+        })
+        runner = BacktestRunner(cfg)
+>       bars = _generate_synthetic_bars(days=3)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_backtest.py:83: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+days = 3
+
+    def _generate_synthetic_bars(days=5):
+        """Generate synthetic 5m bars over multiple days with volume spikes."""
+        bars = []
+        bar_idx = 0
+        for day in range(10, 10 + days):
+            # Asian session (00:00 - 08:00) — flat
+            for hour in range(0, 8):
+                for minute in range(0, 60, 5):
+                    bar_idx += 1
+                    bars.append(Candle(
+                        timestamp=datetime(2024, 6, day, hour, minute, tzinfo=ET),
+                        open=500, high=501, low=499, close=500, volume=50,
+                        bar_index=bar_idx, timeframe="5m",
+                    ))
+    
+            # Pre-Brinks (08:00-09:00)
+            for minute in range(0, 60, 5):
+                bar_idx += 1
+                bars.append(Candle(
+                    timestamp=datetime(2024, 6, day, 8, minute, tzinfo=ET),
+                    open=500, high=502, low=498, close=501, volume=80,
+                    bar_index=bar_idx, timeframe="5m",
+                ))
+    
+            # Brinks session (09:00-10:00) — create a range
+            for minute in range(0, 60, 5):
+                bar_idx += 1
+                # Gradually push price up then down to create a box
+                drift = minute * 0.2
+                bars.append(Candle(
+                    timestamp=datetime(2024, 6, day, 9, minute, tzinfo=ET),
+                    open=500 + drift, high=502 + drift, low=498 + drift,
+                    close=501 + drift, volume=150,
+                    bar_index=bar_idx, timeframe="5m",
+                ))
+    
+            # Trade window (10:00-12:00) — trending up
+            for minute in range(0, 120, 5):
+                bar_idx += 1
+                base = 512 + minute * 0.1
+                bars.append(Candle(
+>                   timestamp=datetime(2024, 6, day, 10, minute, tzinfo=ET),
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                    open=base, high=base + 2, low=base - 1, close=base + 1.5,
+                    volume=200,
+                    bar_index=bar_idx, timeframe="5m",
+                ))
+E               ValueError: minute must be in 0..59, not 60
+
+tests\test_backtest.py:56: ValueError
+________________ TestBacktestRunner.test_report_metrics_valid _________________
+
+self = <tests.test_backtest.TestBacktestRunner object at 0x0000024A8F55C910>
+
+    def test_report_metrics_valid(self):
+        cfg = load_config(overrides={
+            "trade_logic": {"use_ema_filter": False, "require_mid_hold": False},
+            "vectors": {"lookback": 5, "timeframes": ["5m"]},
+        })
+        runner = BacktestRunner(cfg)
+>       bars = _generate_synthetic_bars(days=5)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_backtest.py:95: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+days = 5
+
+    def _generate_synthetic_bars(days=5):
+        """Generate synthetic 5m bars over multiple days with volume spikes."""
+        bars = []
+        bar_idx = 0
+        for day in range(10, 10 + days):
+            # Asian session (00:00 - 08:00) — flat
+            for hour in range(0, 8):
+                for minute in range(0, 60, 5):
+                    bar_idx += 1
+                    bars.append(Candle(
+                        timestamp=datetime(2024, 6, day, hour, minute, tzinfo=ET),
+                        open=500, high=501, low=499, close=500, volume=50,
+                        bar_index=bar_idx, timeframe="5m",
+                    ))
+    
+            # Pre-Brinks (08:00-09:00)
+            for minute in range(0, 60, 5):
+                bar_idx += 1
+                bars.append(Candle(
+                    timestamp=datetime(2024, 6, day, 8, minute, tzinfo=ET),
+                    open=500, high=502, low=498, close=501, volume=80,
+                    bar_index=bar_idx, timeframe="5m",
+                ))
+    
+            # Brinks session (09:00-10:00) — create a range
+            for minute in range(0, 60, 5):
+                bar_idx += 1
+                # Gradually push price up then down to create a box
+                drift = minute * 0.2
+                bars.append(Candle(
+                    timestamp=datetime(2024, 6, day, 9, minute, tzinfo=ET),
+                    open=500 + drift, high=502 + drift, low=498 + drift,
+                    close=501 + drift, volume=150,
+                    bar_index=bar_idx, timeframe="5m",
+                ))
+    
+            # Trade window (10:00-12:00) — trending up
+            for minute in range(0, 120, 5):
+                bar_idx += 1
+                base = 512 + minute * 0.1
+                bars.append(Candle(
+>                   timestamp=datetime(2024, 6, day, 10, minute, tzinfo=ET),
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                    open=base, high=base + 2, low=base - 1, close=base + 1.5,
+                    volume=200,
+                    bar_index=bar_idx, timeframe="5m",
+                ))
+E               ValueError: minute must be in 0..59, not 60
+
+tests\test_backtest.py:56: ValueError
+_________ TestTradingEngine.test_engine_processes_bars_without_crash __________
+
+self = <tests.test_engine.TestTradingEngine object at 0x0000024A8F55CE10>
+cfg = SystemConfig(session=SessionConfig(timezone='America/New_York', brinks_start='09:00', brinks_end='10:00', trade_window...r='alpaca', paper_trading=True, symbol='SPY', position_size_mode='fixed_shares', fixed_shares=100, max_equity_pct=0.1))
+
+    def test_engine_processes_bars_without_crash(self, cfg):
+        engine = TradingEngine(cfg)
+    
+        # Feed a day of bars
+        for minute in range(0, 60, 5):
+            engine.on_bar(_candle(10, 9, minute, 500, 505, 495, 502))
+        for minute in range(0, 120, 5):
+>           engine.on_bar(_candle(10, 10, minute, 502, 510, 498, 508))
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_engine.py:49: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+day = 10, hour = 10, minute = 60, o = 502, h = 510, l = 498, c = 508, vol = 100
+
+    def _candle(day, hour, minute, o, h, l, c, vol=100):
+        return Candle(
+>           timestamp=datetime(2024, 6, day, hour, minute, tzinfo=ET),
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            open=o, high=h, low=l, close=c, volume=vol,
+            timeframe="5m",
+        )
+E       ValueError: minute must be in 0..59, not 60
+
+tests\test_engine.py:17: ValueError
+______________ TestTradingEngine.test_daily_trade_limit_enforced ______________
+
+self = <tests.test_engine.TestTradingEngine object at 0x0000024A8F4D6B10>
+cfg = SystemConfig(session=SessionConfig(timezone='America/New_York', brinks_start='09:00', brinks_end='10:00', trade_window...r='alpaca', paper_trading=True, symbol='SPY', position_size_mode='fixed_shares', fixed_shares=100, max_equity_pct=0.1))
+
+    def test_daily_trade_limit_enforced(self, cfg):
+        """After one trade, no more signals should fire that day."""
+        engine = TradingEngine(cfg)
+    
+        # Warm up indicators
+        for i in range(25):
+            engine.on_bar(_candle(10, 3, i * 2, 500, 502, 498, 501, vol=100))
+    
+        # Form box
+        engine.on_bar(_candle(10, 9, 0, 500, 520, 480, 510, vol=100))
+        engine.on_bar(_candle(10, 10, 0, 510, 511, 509, 510, vol=100))
+    
+        # Count signals fired during trade window
+        signals_fired = 0
+        for minute in range(5, 120, 5):
+>           event = engine.on_bar(_candle(10, 10, minute, 522, 530, 520, 528, vol=2000))
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_engine.py:91: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+day = 10, hour = 10, minute = 60, o = 522, h = 530, l = 520, c = 528, vol = 2000
+
+    def _candle(day, hour, minute, o, h, l, c, vol=100):
+        return Candle(
+>           timestamp=datetime(2024, 6, day, hour, minute, tzinfo=ET),
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+            open=o, high=h, low=l, close=c, volume=vol,
+            timeframe="5m",
+        )
+E       ValueError: minute must be in 0..59, not 60
+
+tests\test_engine.py:17: ValueError
+___________ TestTimeframeVectorTracker.test_no_vector_on_low_volume ___________
+
+self = <tests.test_vectors.TestTimeframeVectorTracker object at 0x0000024A8F4D7A80>
+cfg = VectorConfig(lookback=5, primary_threshold=2.0, secondary_threshold=1.5, body_fraction_min=0.45, max_external_age_bars=24, timeframes=['1m', '5m', '15m'], primary_timeframe='5m')
+
+    def test_no_vector_on_low_volume(self, cfg):
+        tracker = TimeframeVectorTracker("5m", cfg)
+    
+        for i in range(cfg.lookback):
+            c = _candle(i, 100.0, 100.5, 99.5, 100.2, 100)
+            tracker.process_bar(c, is_brinks_session=False)
+    
+        # Normal volume
+        normal = _candle(cfg.lookback, 100.0, 101.0, 99.5, 100.8, 105)
+        vec = tracker.process_bar(normal, is_brinks_session=False)
+>       assert vec is None
+E       assert VectorCandle(direction=<Direction.BULL: 1>, high=101.0, low=99.5, body_high=100.8, body_low=100.0, bar_index=5, timest...ched=99.5, recovery_low_reached=101.0, is_fully_recovered=False, is_partially_recovered=False, confluent_timeframes=[]) is None
+
+tests\test_vectors.py:102: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_backtest.py::TestBacktestRunner::test_runner_completes_without_error
+FAILED tests/test_backtest.py::TestBacktestRunner::test_report_metrics_valid
+FAILED tests/test_engine.py::TestTradingEngine::test_engine_processes_bars_without_crash
+FAILED tests/test_engine.py::TestTradingEngine::test_daily_trade_limit_enforced
+FAILED tests/test_vectors.py::TestTimeframeVectorTracker::test_no_vector_on_low_volume
+======================== 5 failed, 50 passed in 0.22s =========================
